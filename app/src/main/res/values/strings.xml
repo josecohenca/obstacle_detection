@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">obstacle_detection</string>
+    <string name="remote_service_started">Service started</string>
+    <string name="local_service_label">Obstacle Detection running</string>
+</resources>
