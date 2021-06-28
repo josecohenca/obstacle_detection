@@ -10,12 +10,12 @@ import android.content.Intent;
 import android.media.Image;
 import android.os.Build;
 import android.os.IBinder;
-import android.support.v4.app.NotificationCompat;
+import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
 
-import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.Camera;
 import com.google.ar.core.Config;
 import com.google.ar.core.Frame;
@@ -23,17 +23,13 @@ import com.google.ar.core.Session;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
 import com.google.ar.core.exceptions.NotYetAvailableException;
-import com.google.ar.core.exceptions.UnavailableApkTooOldException;
-import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
-import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
-import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
-import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 public class MainService extends Service {
 
+    private PowerManager.WakeLock wakeLock = null;
     private Context myContext;
     private int[][] depthResult;
     public static final String NOTIFICATION = "com.kukuriko.obstacle_detection.MainService";
@@ -84,10 +80,15 @@ public class MainService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, final int startId) {
         Log.i(MainActivity.TAG, "Service onStartCommand");
+        mNotificationManager.notify(FOREGROUND_ID, notification);
+
         startForeground(FOREGROUND_ID, notification);
         Log.i(MainActivity.TAG, "Start foreground");
 
-        mNotificationManager.notify(FOREGROUND_ID, notification);
+
+        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, MainActivity.TAG);
+        wakeLock.acquire();
 
         isRunning = true;
         startDetecting = new Thread(new Runnable(){
@@ -97,7 +98,7 @@ public class MainService extends Service {
         });
         startDetecting.start();
 
-        return Service.START_NOT_STICKY;
+        return Service.START_STICKY;
     }
 
     private void startDetectingLoop(){
@@ -128,6 +129,9 @@ public class MainService extends Service {
                             depthResult[i][j] = getMillimetersDepth(buffer, i, j, pixelStride, rowStride);
                         }
                     }
+                    if(depthResult[maxWidth/2][0]>200){
+                        Log.i(MainActivity.TAG,"obstacle possible");
+                    }
                 } catch (NotYetAvailableException e) {
                     // This normally means that depth data is not available yet. This is normal so we will not
                     // spam the logcat with this.
@@ -151,6 +155,7 @@ public class MainService extends Service {
     public void onDestroy(){
         super.onDestroy();
         isRunning = false;
+        wakeLock.release();
         session.close();
         Log.i( MainActivity.TAG,  "Service onDestroy");
         stopForeground(true);
@@ -167,7 +172,7 @@ public class MainService extends Service {
     public void createSession() {
         try {
             // Create a new ARCore session.
-            session = new Session(this);
+            session = new Session(MainActivity.myContext);
 
             config = session.getConfig();
 

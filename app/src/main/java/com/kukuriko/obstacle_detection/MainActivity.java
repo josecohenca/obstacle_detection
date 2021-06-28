@@ -8,7 +8,6 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -31,7 +30,7 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CAMERA_PERMISSION_RESULT = 23133;
     private static final int REQUEST_ACTIVITY_PERMISSION_RESULT = 32156;
-    private static Context myContext;
+    protected static Context myContext;
     private static Button btStart;
     private static Button btStop;
     private DetectedActivityReceiver receiver;
@@ -76,8 +75,9 @@ public class MainActivity extends AppCompatActivity {
         btStart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
-                Intent serviceIntent = new Intent(MainActivity.this, MainService.class);
+                // Start activity detection as a service instead of the obstacle detection directly
+                // The activity will be responsible to start the obstacle detection
+                Intent serviceIntent = new Intent(myContext, MainService.class);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     startForegroundService(serviceIntent);
                 }
@@ -89,7 +89,7 @@ public class MainActivity extends AppCompatActivity {
         btStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent serviceIntent = new Intent(MainActivity.this, MainService.class);
+                Intent serviceIntent = new Intent(myContext, MainService.class);
                 stopService(serviceIntent);
 
             }
@@ -117,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
 
         receiver = new DetectedActivityReceiver();
 
-        LocalBroadcastManager.getInstance(this).registerReceiver(
+        registerReceiver(
                 receiver, new IntentFilter(DetectedActivityReceiver.RECEIVER_ACTION)
         );
 
@@ -150,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
 
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver);
+        unregisterReceiver(receiver);
 
         // myPendingIntent is the instance of PendingIntent where the app receives callbacks.
         Task<Void> task = ActivityRecognition.getClient(myContext)
